@@ -35,7 +35,6 @@ KS 검정 방법 (둘 다 산출·명시)
       붕괴 seed 를 포함/제외한 두 벌의 요약을 모두 출력한다.
         frag_seeds8_summary_260910.csv         전체 8 seed (그대로)
         frag_seeds8_summary_robust_260910.csv  붕괴 seed 제외 (n_seeds 로 표본 명시)
-      본문에는 robust 판을 쓰고 붕괴 seed 수를 각주로 밝히는 것을 권장한다.
 
 출력 (results/frag/)
   frag_seeds8_per_image_260910.csv     이미지 단위 원자료 (기존 *_all.csv 구조 + seed)

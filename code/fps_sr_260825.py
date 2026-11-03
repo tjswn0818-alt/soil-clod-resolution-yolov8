@@ -2,7 +2,7 @@
 SR 모델 추론 FPS 측정 (bilinear 전처리, test 세트).
 
 측정 A) matched: SR 9개(seed 0)를 각각 자기 학습 해상도로 추론
-측정 B) Fig 6용: SR-736 을 eval 1600/1280/1024/736/512 로 추론
+측정 B) speed–recall plot (legacy): SR-736 을 eval 1600/1280/1024/736/512 로 추론
 
 프로토콜
   - 입력: test 20장을 cv2.INTER_LINEAR 로 r32 x r32 리사이즈 (타이밍 구간 밖 = 데이터 준비)
@@ -18,7 +18,7 @@ SR 모델 추론 FPS 측정 (bilinear 전처리, test 세트).
 출력
   results/fps_sr_matched_260825.csv
   results/fps_sr736_evalsweep_260825.csv
-  figures/fig6_speed_accuracy_260825.png   (속도-정확도 트레이드오프)
+  figures/speed_recall_legacy_260825.png   (speed–recall plot, legacy)
 """
 import csv
 import sys
@@ -36,8 +36,8 @@ import eval_pixel_final as E  # noqa: E402
 
 STAMP = "260825"
 LADDER = [1600, 1280, 1024, 736, 512, 448, 384, 256, 128]
-FIG6_EVALS = [1600, 1280, 1024, 736, 512]
-FIG6_MODEL = 736
+SWEEP_EVALS = [1600, 1280, 1024, 736, 512]
+SWEEP_MODEL = 736
 TEST_DIR = E.PIXEL_ROOT / "18.v1i.coco-segmentation" / "train"
 WARMUP = 10
 N_ITER = 100
@@ -163,15 +163,15 @@ def main():
                     "Recall_test", "Recall_val"])
         w.writerows(rowsA)
 
-    # ── B) Fig 6: SR-736 x eval 스윕 ──
+    # ── B) speed–recall plot (legacy): SR-736 x eval 스윕 ──
     rowsB = []
     print("\n" + "=" * 96)
-    print(f"=== B) Fig 6 — SR-{FIG6_MODEL} 모델을 여러 eval 해상도로 추론 ===")
+    print(f"=== B) speed–recall plot (legacy) — SR-{SWEEP_MODEL} 모델을 여러 eval 해상도로 추론 ===")
     print("=" * 96)
     print(f"{'eval':>6} {'r32':>6} | {'pure ms':>9} {'pure FPS':>9} | "
           f"{'full ms':>9} {'full FPS':>9} | {'R_test':>7} {'R_val':>7}")
-    ck = E.sr_ckpt(FIG6_MODEL)
-    for ev in FIG6_EVALS:
+    ck = E.sr_ckpt(SWEEP_MODEL)
+    for ev in SWEEP_EVALS:
         rr = r32_of(ev)
         imgs_r = prep(images, rr)
         model = YOLO(str(ck))
@@ -179,11 +179,11 @@ def main():
         sf = stats(bench_predict(model, imgs_r, rr))
         del model
         torch.cuda.empty_cache()
-        Rt = rec.get((FIG6_MODEL, ev), float("nan"))
-        Rv = rec_val.get((FIG6_MODEL, ev), float("nan"))
+        Rt = rec.get((SWEEP_MODEL, ev), float("nan"))
+        Rv = rec_val.get((SWEEP_MODEL, ev), float("nan"))
         print(f"{ev:>6} {rr:>6} | {sp['mean_ms']:>9.2f} {sp['fps']:>9.1f} | "
               f"{sf['mean_ms']:>9.2f} {sf['fps']:>9.1f} | {Rt:>7.4f} {Rv:>7.4f}")
-        rowsB.append([FIG6_MODEL, ev, rr,
+        rowsB.append([SWEEP_MODEL, ev, rr,
                       round(sp["mean_ms"], 3), round(sp["sd_ms"], 3), round(sp["fps"], 2),
                       round(sf["mean_ms"], 3), round(sf["sd_ms"], 3), round(sf["fps"], 2),
                       round(Rt, 4), round(Rv, 4)])
@@ -236,7 +236,7 @@ def plot(rowsA, rowsB):
                     xytext=(6, 6), fontsize=9)
     ax.set_xlabel("FPS (full predict pipeline)")
     ax.set_ylabel("Recall")
-    ax.set_title(f"B) SR-{FIG6_MODEL} across inference resolutions", fontsize=11)
+    ax.set_title(f"B) SR-{SWEEP_MODEL} across inference resolutions", fontsize=11)
     ax.legend(loc="lower right", fontsize=9)
     ax.grid(alpha=0.25, lw=0.6)
     ax.set_axisbelow(True)
@@ -244,7 +244,7 @@ def plot(rowsA, rowsB):
     fig.suptitle("Speed-accuracy trade-off (RTX 4090, batch=1, FP32, bilinear)",
                  fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.94])
-    out = E.FIGURES / f"fig6_speed_accuracy_{STAMP}.png"
+    out = E.FIGURES / f"speed_recall_legacy_{STAMP}.png"
     fig.savefig(out, dpi=160)
     plt.close(fig)
     print(f"저장: {out}")
