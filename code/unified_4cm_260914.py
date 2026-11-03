@@ -32,7 +32,7 @@
   (2) Cross 9x9    9 학습 x 9 추론 해상도, Recall 행렬. 대각선 = (1)
   (3) 검출 수준     P3/P4/P5 점유율 (matched, >=4cm 예측 기준)
   (4) MR           6 범위 x 추론 448/512/736/1024
-  (5) 파쇄도 특성   SR matched 9 + MR 20 조건
+  (5) 파쇄도 특성   SR matched 9 + MR 24 조건
   (6) FPS          기존 측정 승계 (타이밍은 필터·매칭과 무관, 이미 bilinear 규약)
 
   raw 는 (2)(4) 전 셀에 대해 셀 단위로 남기고, 파쇄도용 이미지/개체/매칭쌍 raw 는
@@ -519,7 +519,7 @@ def summarize_level():
 
 
 def summarize_frag(seeds):
-    """(5) 파쇄도 특성 — SR matched 9 + MR 20, seed 별 계산 후 평균±SD."""
+    """(5) 파쇄도 특성 — SR matched 9 + MR 24, seed 별 계산 후 평균±SD."""
     IM, IN, PA, _ = S.group_raw(
         lambda r: (r["dataset"], r["family"], r["model"], int(r["eval_res"]),
                    int(r["seed"])), (P_IMG, P_INS, P_PAR, P_CELL))
