@@ -1,0 +1,585 @@
+"""
+파쇄도 특성 분석 — MR(다해상도 학습) 모델 5종 x 추론해상도 4단 x 8 seed.
+
+목적
+  "MR 로 학습해도 파쇄도 특성이 재현되는가, 학습 범위(좁음<->넓음)가 파쇄도
+  특성 재현에 어떻게 영향을 주는가" 를 SR(clod_frag_seeds8_260910.py) 과
+  완전히 동일한 기준으로 본다.
+
+방법 — SR 과 동일. 수식은 공유 함수 하나(clod_frag_seeds8_260910.metrics_one)만
+       호출하므로 SR/MR 사이에 계산 차이가 생길 수 없다.
+  - test set 20장, GT clod(4cm+) 114개, seed 0-7
+  - conf >= 0.5, 매칭 IoU >= 0.5 예측 면적 내림차순 greedy
+  - clod 정의: 장축 >= 4cm (MIN_MAJOR_FRAC = 0.08), 프레임 50cm
+  - 면적/직경은 원본 격자로 복원 후 cm 환산, ED = 2*sqrt(A/pi)
+
+대상 (5 MR x 4 추론해상도 = 20조건, 각 8 seed = 160셀)
+  MR[448-1024], MR[448-1280], MR[448-1600], MR[384-1600], MR[128-1600]
+  추론 해상도 448 / 512 / 736 / 1024 px  (SR-448/512/736/1024 와 1:1 대응)
+  가중치: weights/mr/{TAG}_s{seed}.pt   (mr_seeds8_manifest_260825.csv 와 동일)
+
+★ 보간(interpolation) 주의 ★
+  SR 파쇄도 분석은 이미지 리사이즈에 INTER_AREA 를 쓴다.
+  반면 MR 인식 평가(eval_mr_seeds_260825.py)는 INTER_LINEAR 를 쓰며,
+  그 스크립트 주석에 "INTER_AREA 로 만든 결과와 직접 비교하면 안 된다" 고 못박혀 있다.
+  이 스크립트는 두 벌을 모두 만든다.
+    --interp area   (기본) : SR 파쇄도 결과와 직접 비교 가능. ★본문 기본★
+                             SR·MR 모델 모두 ultralytics(bilinear) 로 학습됐으므로
+                             전처리 불일치가 양쪽에 동일하게 걸려 비교가 공정하다.
+    --interp linear         : MR 인식 표(cross_mr_8seed_linear)와 묶어 볼 때 사용.
+  출력 파일명에 보간이 들어가므로 서로 덮어쓰지 않는다.
+
+지표 — SR 과 동일한 4군, seed 별로 구한 뒤 8-seed 평균±SD
+  1) clod 개수     : MAE, RMSE, R2(1:1), bias, FN/img, FP/img
+  2) 매칭 clod 크기 : ED MAE, ED RMSE, ED R2(1:1), area_bias_pct, mean_IoU
+  3) 크기 분포      : KS D, KS p (seed 별 검정 후 평균), Wasserstein
+  4) 조대 clod 면적비: 4cm+ 면적 / 프레임 -> MAE, bias (+ RMSE, R2)
+
+유효 표본 처리 — SR 과 동일한 2단계
+  (i) 표본 부족(매칭쌍 < 3, 예측 인스턴스 < 3) -> 해당 지표 NaN + 유효 seed 수 기록
+  (ii) 검출 붕괴(Precision < 0.10 또는 Recall < 0.10) -> collapsed=1 로 표시하고
+       붕괴 seed 를 제외한 robust 요약을 별도로 출력
+
+출력 (results/frag/)
+  frag_mr_seeds8_{interp}_per_image_260910.csv   이미지 단위 원자료 (+ seed, eval_res)
+  frag_mr_seeds8_{interp}_instances_260910.csv   개체 단위 원자료
+  frag_mr_seeds8_{interp}_pairs_260910.csv       매칭쌍 원자료
+  frag_mr_seeds8_{interp}_detection_260910.csv   조건 x seed 검출 요약
+  frag_mr_seeds8_{interp}_metrics_260910.csv     seed 단위 지표 (160행)
+  frag_mr_seeds8_{interp}_summary_robust_260910.csv  ★본문용★ 평균±SD, 붕괴 seed 제외
+  frag_mr_seeds8_{interp}_summary_260910.csv         전체 8 seed 판
+  frag_mr_seeds8_{interp}_summary_long*_260910.csv   long 포맷
+  frag_mr_vs_sr_{interp}_260910.csv              SR 대응 조건과 나란히 놓은 비교표
+  figures/frag_mr_seeds8_{interp}_260910.png     추론해상도축 평균±SD 그림
+  figures/frag_mr_vs_sr_{interp}_260910.png      MR vs SR 비교 그림
+"""
+import argparse
+import csv
+import sys
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+import torch
+from ultralytics import YOLO
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import clod_frag_260907 as F              # noqa: E402  계산 커널
+import clod_frag_seeds8_260910 as S       # noqa: E402  SR 판 — 지표/집계 로직 공유
+
+STAMP = "260910"
+OUT, FIG = F.OUT, F.FIG
+FRAME_CM = F.FRAME_CM
+NAN = float("nan")
+
+# (라벨, 가중치 TAG) — eval_mr_seeds_260825.MR_SPECS 와 동일, 좁은 범위부터
+MR_SPECS = [("MR[448-1024]", "_448_1024"),
+            ("MR[448-1280]", "_448_1280"),
+            ("MR[448-1600]", "_448_1600"),
+            ("MR[384-1600]", "_384_1600"),
+            ("MR[128-1600]", "_128_1600")]
+EVAL_RES = [448, 512, 736, 1024]      # 안정 범위 전체 (모두 32의 배수)
+SEEDS = list(range(8))
+# 비교용 SR 대응 모델 — (SR 라벨, 대응 eval_res)
+SR_MATCH = {448: "SR-448", 512: "SR-512", 736: "SR-736", 1024: "SR-1024"}
+
+INTERP = {"area": cv2.INTER_AREA, "linear": cv2.INTER_LINEAR}
+
+H_IMG = ["dataset", "model", "eval_res", "seed", "file",
+         "n_clod_GT", "n_clod_Pred", "area4cm_GT_cm2", "area4cm_Pred_cm2",
+         "ratio_frame_GT", "ratio_frame_Pred", "area_allclod_GT_cm2",
+         "area_allclod_Pred_cm2", "ratio_ofclod_GT", "ratio_ofclod_Pred",
+         "TP", "FN", "FP"]
+H_INS = ["dataset", "model", "eval_res", "seed", "file", "source", "idx",
+         "area_cm2", "ed_cm", "major_cm", "matched"]
+H_PAR = ["dataset", "model", "eval_res", "seed", "file", "gt_idx", "pred_idx",
+         "iou", "area_GT_cm2", "area_Pred_cm2", "ed_GT_cm", "ed_Pred_cm",
+         "major_GT_cm", "major_Pred_cm"]
+H_DET = ["dataset", "model", "eval_res", "seed", "n_images", "n_GT_clod",
+         "n_Pred_clod", "TP", "Recall", "Precision"]
+
+rd, fm, fnum = S.rd, S.fm, S.fnum
+append_rows, load_rows = S.append_rows, S.load_rows
+METRICS, MKEYS = S.METRICS, S.MKEYS
+
+
+def paths(interp):
+    p = OUT / f"frag_mr_seeds8_{interp}"
+    return (Path(f"{p}_per_image_{STAMP}.csv"), Path(f"{p}_instances_{STAMP}.csv"),
+            Path(f"{p}_pairs_{STAMP}.csv"), Path(f"{p}_detection_{STAMP}.csv"))
+
+
+def ckpt_of(tag, seed):
+    return F.WEIGHTS / "mr" / f"{tag}_s{seed}.pt"
+
+
+# ────────────────────────── 추론 ──────────────────────────
+def run_all(interp, ds, specs, evals, seeds, force=False):
+    P_IMG, P_INS, P_PAR, P_DET = paths(interp)
+    if force:
+        for p in (P_IMG, P_INS, P_PAR, P_DET):
+            p.unlink(missing_ok=True)
+    done = {(r["dataset"], r["model"], int(r["eval_res"]), int(r["seed"]))
+            for r in load_rows(P_DET)}
+    total = len(specs) * len(evals) * len(seeds)
+    todo = [(lbl, e, s) for lbl, _ in specs for e in evals for s in seeds
+            if (ds, lbl, e, s) not in done]
+    print("=" * 118)
+    print(f"MR 파쇄도 추론 [{ds}] | 보간 {interp.upper()} | "
+          f"{len(specs)}MR x {len(evals)}해상도 x {len(seeds)}seed = {total}셀, "
+          f"남은 {len(todo)}셀")
+    print("conf>=0.5, IoU>=0.5 greedy(면적 내림차순), clod 장축>=4cm, 프레임 50cm")
+    print("=" * 118)
+    if not todo:
+        print("모든 셀이 이미 누적되어 있습니다 — 집계로 넘어갑니다.")
+        return
+
+    d = F.DATASETS[ds]
+    gt = F.load_gt(d)
+    files = sorted(gt)
+    ngt = sum(len(gt[f]["masks"]) for f in files)
+    img_cache = {f: cv2.imread(str(d / f)) for f in files}   # 20장 1회 로드
+    print(f"[{ds}] {d.name} | 이미지 {len(files)}장 | GT clod(4cm+) {ngt}개\n")
+    print(f"{'model':>13} {'seed':>4} {'eval':>5} {'Pred':>5} {'TP':>4} "
+          f"{'Recall':>8} {'Precision':>10} {'sec':>6}")
+    ip = INTERP[interp]
+    for lbl, tag in specs:
+        for sd in seeds:
+            need = [e for e in evals if (ds, lbl, e, sd) not in done]
+            if not need:
+                continue
+            ck = ckpt_of(tag, sd)
+            if not ck.exists():
+                print(f"  [skip] 가중치 없음: {ck}")
+                continue
+            model = YOLO(str(ck))          # seed 당 1회 로드, 4해상도 재사용
+            for er in need:
+                t0 = time.time()
+                R, r32 = F.run_model(ck, gt, d, er, interp=ip, model=model,
+                                     img_cache=img_cache)
+                TP = sum(R[f]["tp"] for f in files)
+                NP = sum(len(R[f]["preds"]) for f in files)
+                rec = TP / ngt if ngt else NAN
+                pre = TP / NP if NP else NAN
+                pim, ins, par = [], [], []
+                for f in files:
+                    g, r = gt[f], R[f]
+                    cpp = g["cpp"]
+                    gs = [F.shape_stats(m, cpp) for m in g["masks"]]
+                    ps = [F.shape_stats(m, cpp) for m in r["preds"]]
+                    frame = FRAME_CM ** 2
+                    ga, pa = sum(x[0] for x in gs), sum(x[0] for x in ps)
+                    pim.append([ds, lbl, r32, sd, f, len(gs), len(ps),
+                                round(ga, 3), round(pa, 3),
+                                round(ga / frame, 5), round(pa / frame, 5),
+                                round(g["total_clod_cm2"], 3),
+                                round(r["pred_all_area_cm2"], 3),
+                                rd(ga / g["total_clod_cm2"])
+                                if g["total_clod_cm2"] > 0 else "",
+                                rd(pa / r["pred_all_area_cm2"])
+                                if r["pred_all_area_cm2"] > 0 else "",
+                                r["tp"], len(gs) - r["tp"], len(ps) - r["tp"]])
+                    inv = {di: gi for gi, (di, _) in r["pairs"].items()}
+                    for i, (a, e2, mj) in enumerate(gs):
+                        ins.append([ds, lbl, r32, sd, f, "GT", i, round(a, 4),
+                                    round(e2, 4), round(mj, 4),
+                                    int(r["flags"][i])])
+                    for i, (a, e2, mj) in enumerate(ps):
+                        ins.append([ds, lbl, r32, sd, f, "Pred", i, round(a, 4),
+                                    round(e2, 4), round(mj, 4), int(i in inv)])
+                    for gi, (di, iou) in r["pairs"].items():
+                        par.append([ds, lbl, r32, sd, f, gi, di, round(iou, 4),
+                                    round(gs[gi][0], 4), round(ps[di][0], 4),
+                                    round(gs[gi][1], 4), round(ps[di][1], 4),
+                                    round(gs[gi][2], 4), round(ps[di][2], 4)])
+                append_rows(P_IMG, H_IMG, pim)
+                append_rows(P_INS, H_INS, ins)
+                append_rows(P_PAR, H_PAR, par)
+                append_rows(P_DET, H_DET, [[ds, lbl, r32, sd, len(files), ngt,
+                                            NP, TP, rd(rec), rd(pre)]])
+                print(f"{lbl:>13} {sd:>4} {r32:>5} {NP:>5} {TP:>4} "
+                      f"{fm(rec, 8, 3)} {fm(pre, 10, 3)} "
+                      f"{time.time() - t0:>6.1f}", flush=True)
+            del model
+            torch.cuda.empty_cache()
+
+
+# ────────────────────── seed 단위 지표 ──────────────────────
+def seed_metrics(interp, ds, specs, evals, seeds):
+    """SR 과 동일한 수식(S.metrics_one)을 (model, eval_res, seed) 키로 적용."""
+    IM, IN, PA, DE = S.group_raw(
+        lambda r: (r["dataset"], r["model"], int(r["eval_res"]), int(r["seed"])),
+        paths(interp))
+    rows = []
+    for lbl, _ in specs:
+        for er in evals:
+            for sd in seeds:
+                k = (ds, lbl, er, sd)
+                if k not in IM:
+                    continue
+                rows.append(S.metrics_one(IM[k], PA.get(k, []), IN.get(k, []),
+                                          DE.get(k, {}), dataset=ds, model=lbl,
+                                          eval_res=er, seed=sd))
+    cols = ["dataset", "model", "eval_res", "seed", "collapsed", "n_images",
+            "n_GT_clod", "n_Pred_clod", "TP", "n_gt_inst", "ED_GT_mean",
+            "ED_Pred_mean", "ratioFrame_n", "ratioClod_n"] + MKEYS
+    with open(OUT / f"frag_mr_seeds8_{interp}_metrics_{STAMP}.csv", "w",
+              newline="", encoding="utf-8-sig") as fh:
+        w = csv.writer(fh)
+        w.writerow(cols)
+        for m in rows:
+            w.writerow([m.get(c, "") if c in ("dataset", "model")
+                        else rd(m.get(c, ""), 6) for c in cols])
+    return rows
+
+
+# ────────────────────── 8-seed 집계 ──────────────────────
+def summarize(interp, rows, ds, specs, evals, drop_collapsed=False, quiet=False):
+    """SR 의 frag_seeds8_summary 와 같은 지표 컬럼 + model/eval_res 키."""
+    out_long, out_wide = [], []
+    for lbl, _ in specs:
+        for er in evals:
+            sel = [m for m in rows if m["model"] == lbl and m["eval_res"] == er]
+            if not sel:
+                continue
+            n_all = len(sel)
+            n_col = sum(m["collapsed"] for m in sel)
+            if drop_collapsed:
+                sel = [m for m in sel if not m["collapsed"]]
+            if not sel:
+                continue
+            wide = [ds, lbl, er, len(sel), n_all, n_col]
+            for k, name in METRICS:
+                n, mu, sd, mn, mx = S.agg_metric(sel, k)
+                out_long.append([ds, lbl, er, k, name, n, rd(mu, 6), rd(sd, 6),
+                                 rd(mn, 6), rd(mx, 6), n_all, n_col])
+                wide += [rd(mu, 6), rd(sd, 6), n]
+            pv = np.array([float(m.get("ED_KS_p", NAN)) for m in sel], float)
+            pv = pv[np.isfinite(pv)]
+            wide += [rd(float(np.median(pv)) if len(pv) else NAN, 6),
+                     int((pv < 0.05).sum()) if len(pv) else "", len(pv)]
+            out_wide.append(wide)
+
+    hdr = ["dataset", "model", "eval_res", "n_seeds_used", "n_seeds_total",
+           "n_seeds_collapsed"]
+    for k, _ in METRICS:
+        hdr += [f"{k}_mean", f"{k}_sd", f"{k}_n"]
+    hdr += ["ED_KS_p_median", "ED_KS_p_n_reject_005", "ED_KS_p_n_valid"]
+    sfx = "_robust" if drop_collapsed else ""
+    base = OUT / f"frag_mr_seeds8_{interp}"
+    with open(f"{base}_summary{sfx}_{STAMP}.csv", "w", newline="",
+              encoding="utf-8-sig") as fh:
+        w = csv.writer(fh)
+        w.writerow(hdr)
+        w.writerows(out_wide)
+    with open(f"{base}_summary_long{sfx}_{STAMP}.csv", "w", newline="",
+              encoding="utf-8-sig") as fh:
+        w = csv.writer(fh)
+        w.writerow(["dataset", "model", "eval_res", "metric", "metric_label",
+                    "n_valid_seeds", "mean", "sd", "min", "max",
+                    "n_seeds_total", "n_seeds_collapsed"])
+        w.writerows(out_long)
+    if quiet:
+        return out_long, out_wide
+
+    GROUPS = [("1) clod 개수",
+               [("Recall", 3), ("count_MAE", 2), ("count_RMSE", 2),
+                ("count_R2_1to1", 2), ("count_bias", 2), ("FN_per_img", 2),
+                ("FP_per_img", 2)]),
+              ("2) 매칭 clod 크기",
+               [("ED_MAE_cm", 3), ("ED_RMSE_cm", 3), ("ED_R2_1to1", 3),
+                ("area_bias_pct", 2), ("mean_IoU", 3)]),
+              ("3) 크기 분포 (ED, per-seed KS)",
+               [("ED_KS_D", 3), ("ED_KS_p", 3), ("ED_wasserstein", 3)]),
+              ("4) 조대 clod 면적비 (프레임 기준, %p)",
+               [("ratioFrame_MAE", 2), ("ratioFrame_bias", 2)])]
+    L = dict(METRICS)
+    LG = {(r[1], r[2], r[3]): r for r in out_long}
+    note = "붕괴 seed 제외" if drop_collapsed else "전체 8 seed"
+    for gname, keys in GROUPS:
+        print("\n" + "=" * 118)
+        print(f"[{ds}] {gname} — MR 8-seed 평균 ± SD ({note}, n = 유효 seed 수) "
+              f"| 보간 {interp.upper()}")
+        print("=" * 118)
+        head = f"{'model':>13} {'eval':>5}"
+        for k, _ in keys:
+            head += f" | {L[k]:>24}"
+        print(head)
+        for er in evals:
+            for lbl, _ in specs:
+                r = [LG.get((lbl, er, k)) for k, _ in keys]
+                line = f"{lbl:>13} {er:>5}"
+                for (k, prec), rr in zip(keys, r):
+                    if rr is None:
+                        line += f" | {'-':>24}"
+                        continue
+                    mu = float(rr[6]) if rr[6] != "" else NAN
+                    sd = float(rr[7]) if rr[7] != "" else NAN
+                    s = ("nan" if not np.isfinite(mu) else
+                         f"{mu:.{prec}f} ± "
+                         f"{'nan' if not np.isfinite(sd) else f'{sd:.{prec}f}'}")
+                    line += f" | {s + f' ({rr[5]})':>24}"
+                print(line)
+            print()
+    return out_long, out_wide
+
+
+# ────────────────── 검출 붕괴 점검 ──────────────────
+def collapse_table(rows, specs, evals):
+    print("\n" + "=" * 118)
+    print(f"=== 검출 붕괴 seed 점검 (Precision < {S.COLLAPSE_PREC} 또는 "
+          f"Recall < {S.COLLAPSE_REC}) — SR 과 동일 기준 ===")
+    print("=" * 118)
+    print(f"{'model':>13} {'eval':>5} {'붕괴 seed':>16} {'n_붕괴':>7} "
+          f"{'Precision 범위':>20} {'Recall 범위':>20}")
+    any_bad = False
+    for lbl, _ in specs:
+        for er in evals:
+            sel = [m for m in rows if m["model"] == lbl and m["eval_res"] == er]
+            if not sel:
+                continue
+            bad = [m["seed"] for m in sel if m["collapsed"]]
+            any_bad |= bool(bad)
+            pr = [m["Precision"] for m in sel if np.isfinite(m["Precision"])]
+            rc = [m["Recall"] for m in sel if np.isfinite(m["Recall"])]
+            print(f"{lbl:>13} {er:>5} {(str(bad) if bad else '-'):>16} "
+                  f"{len(bad):>7} "
+                  f"{f'{min(pr):.3f} - {max(pr):.3f}' if pr else 'nan':>20} "
+                  f"{f'{min(rc):.3f} - {max(rc):.3f}' if rc else 'nan':>20}")
+    if not any_bad:
+        print("\n  -> 붕괴 seed 없음. 20개 MR 조건 모두 8 seed 전부 유효.")
+    return any_bad
+
+
+# ────────────────── MR vs SR 비교표 ──────────────────
+KEY_METRICS = [("Recall", 3), ("count_MAE", 2), ("count_RMSE", 2),
+               ("count_R2_1to1", 2), ("count_bias", 2), ("FN_per_img", 2),
+               ("FP_per_img", 2), ("ED_MAE_cm", 3), ("ED_RMSE_cm", 3),
+               ("ED_R2_1to1", 3), ("area_bias_pct", 2), ("mean_IoU", 3),
+               ("ED_KS_D", 3), ("ED_KS_p", 3), ("ED_wasserstein", 3),
+               ("ratioFrame_MAE", 2), ("ratioFrame_bias", 2)]
+
+
+def vs_sr(interp, out_long, specs, evals):
+    """SR robust 요약(frag_seeds8_summary_long_robust)과 나란히 놓는다."""
+    p = OUT / f"frag_seeds8_summary_long_robust_{STAMP}.csv"
+    if not p.exists():
+        print(f"\n[경고] SR 요약이 없어 비교표를 건너뜁니다: {p.name}")
+        return []
+    sr = {}
+    for r in load_rows(p):
+        sr[(r["model"], r["metric"])] = r
+    MR = {(r[1], r[2], r[3]): r for r in out_long}
+
+    rows = []
+    print("\n" + "=" * 118)
+    print("=== MR vs SR — 동일 추론 해상도에서 (test, 8-seed 평균 ± SD, "
+          "붕괴 seed 제외) ===")
+    if interp == "area":
+        print("    두 결과 모두 INTER_AREA -> 직접 비교 가능")
+    else:
+        print("    ※ MR 은 INTER_LINEAR, SR 은 INTER_AREA -> 참고용 (직접 비교 부적절)")
+    print("=" * 118)
+    for k, prec in KEY_METRICS:
+        lab = dict(METRICS)[k]
+        print(f"\n[{lab}]")
+        print(f"{'eval':>5} {'SR(대응)':>22}" +
+              "".join(f" {l:>22}" for l, _ in specs))
+        for er in evals:
+            srl = SR_MATCH.get(er)
+            s = sr.get((srl, k))
+            cell = "-"
+            if s and s["mean"] != "":
+                sd = s["sd"]
+                cell = (f"{float(s['mean']):.{prec}f} ± "
+                        f"{float(sd):.{prec}f}" if sd != ""
+                        else f"{float(s['mean']):.{prec}f}")
+            line = f"{er:>5} {f'{srl}: {cell}':>22}"
+            for lbl, _ in specs:
+                r = MR.get((lbl, er, k))
+                c = "-"
+                if r and r[6] != "":
+                    c = (f"{float(r[6]):.{prec}f} ± {float(r[7]):.{prec}f}"
+                         if r[7] != "" else f"{float(r[6]):.{prec}f}")
+                line += f" {c:>22}"
+                rows.append([er, srl, k, lab,
+                             s["mean"] if s else "", s["sd"] if s else "",
+                             lbl, r[6] if r else "", r[7] if r else "",
+                             r[5] if r else ""])
+            print(line)
+    with open(OUT / f"frag_mr_vs_sr_{interp}_{STAMP}.csv", "w", newline="",
+              encoding="utf-8-sig") as fh:
+        w = csv.writer(fh)
+        w.writerow(["eval_res", "SR_model", "metric", "metric_label",
+                    "SR_mean", "SR_sd", "MR_model", "MR_mean", "MR_sd",
+                    "MR_n_valid_seeds"])
+        w.writerows(rows)
+    return rows
+
+
+# ─────────────────────────── 그림 ───────────────────────────
+def plot(interp, out_long, specs, evals):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    COL = ["#4C78A8", "#54A24B", "#E45756", "#F58518", "#B279A2"]
+    LG = {(r[1], r[2], r[3]): r for r in out_long}
+
+    def ms(lbl, k):
+        mu, sd = [], []
+        for er in evals:
+            r = LG.get((lbl, er, k))
+            mu.append(float(r[6]) if r and r[6] != "" else np.nan)
+            sd.append(float(r[7]) if r and r[7] != "" else np.nan)
+        return np.array(mu), np.array(sd)
+
+    # SR 참조선
+    p = OUT / f"frag_seeds8_summary_long_robust_{STAMP}.csv"
+    SR = {}
+    if p.exists():
+        for r in load_rows(p):
+            SR[(r["model"], r["metric"])] = r
+
+    def sr_series(k):
+        v = []
+        for er in evals:
+            r = SR.get((SR_MATCH.get(er), k))
+            v.append(float(r["mean"]) if r and r["mean"] != "" else np.nan)
+        return np.array(v)
+
+    PANELS = [("Recall", "Recall (clod, major axis >= 4 cm)",
+               "(a) Detection recall"),
+              ("count_MAE", "clod count MAE (clods / image)",
+               "(b) Clod-count error"),
+              ("count_R2_1to1", "count R$^2$ (1:1 line)",
+               "(c) Clod-count agreement"),
+              ("ED_MAE_cm", "ED MAE (cm)", "(d) Per-clod size error"),
+              ("ED_R2_1to1", "ED R$^2$ (1:1 line)", "(e) Per-clod size fidelity"),
+              ("area_bias_pct", "area bias (%)", "(f) Per-clod area bias"),
+              ("ED_KS_D", "KS D (ED distribution)",
+               "(g) Size-distribution distance"),
+              ("ED_wasserstein", "Wasserstein distance (cm)",
+               "(h) Size-distribution shift"),
+              ("ratioFrame_MAE", "coarse-clod area ratio MAE (%p)",
+               "(i) Fragmentation-index error")]
+    fig, axes = plt.subplots(3, 3, figsize=(17, 13.4))
+    for ax, (k, ylab, ttl) in zip(axes.ravel(), PANELS):
+        for i, (lbl, _) in enumerate(specs):
+            mu, sd = ms(lbl, k)
+            ax.errorbar(evals, mu, yerr=sd, fmt="o-", color=COL[i % len(COL)],
+                        lw=1.8, ms=5.5, capsize=3, elinewidth=1.1, alpha=.9,
+                        label=lbl)
+        y = sr_series(k)
+        if np.isfinite(y).any():
+            ax.plot(evals, y, "k--s", lw=1.6, ms=5, alpha=.75,
+                    label="SR (matched)")
+        ax.set_xscale("log", base=2)
+        ax.set_xticks(evals)
+        ax.set_xticklabels([str(x) for x in evals], fontsize=9)
+        ax.minorticks_off()
+        ax.set_xlabel("inference resolution (px)")
+        ax.set_ylabel(ylab)
+        ax.set_title(ttl, fontsize=11)
+        if k in ("count_R2_1to1", "count_bias", "area_bias_pct"):
+            ax.axhline(0, color="#888", ls=":", lw=1)
+        ax.grid(alpha=.25, lw=.6)
+        ax.set_axisbelow(True)
+        ax.legend(fontsize=7.5)
+    fig.suptitle("Fragmentation-assessment fidelity of multi-resolution models "
+                 f"— 5 training ranges x 4 inference resolutions, 8 seeds "
+                 f"(test, {interp.upper()} resize)\n"
+                 "error bars = SD across seeds; dashed black = single-resolution "
+                 "(SR) model at the matched resolution", fontsize=12)
+    fig.tight_layout(rect=[0, 0.01, 1, 0.945])
+    q = FIG / f"frag_mr_seeds8_{interp}_{STAMP}.png"
+    fig.savefig(q, dpi=170)
+    plt.close(fig)
+    print(f"\n저장: {q}")
+
+    # 학습범위 폭 vs 파쇄도 지표 (추론해상도별 선)
+    WIDTH = {"MR[448-1024]": 1024 / 448, "MR[448-1280]": 1280 / 448,
+             "MR[448-1600]": 1600 / 448, "MR[384-1600]": 1600 / 384,
+             "MR[128-1600]": 1600 / 128}
+    xs = [WIDTH[l] for l, _ in specs]
+    fig, axes = plt.subplots(1, 4, figsize=(19, 4.6))
+    for ax, (k, ylab, ttl) in zip(axes, [
+            ("Recall", "Recall", "(a) Detection recall"),
+            ("ED_MAE_cm", "ED MAE (cm)", "(b) Per-clod size error"),
+            ("ED_KS_D", "KS D", "(c) Size-distribution distance"),
+            ("ratioFrame_MAE", "area ratio MAE (%p)",
+             "(d) Fragmentation-index error")]):
+        for j, er in enumerate(evals):
+            y = [float(LG[(l, er, k)][6]) if LG.get((l, er, k))
+                 and LG[(l, er, k)][6] != "" else np.nan for l, _ in specs]
+            e = [float(LG[(l, er, k)][7]) if LG.get((l, er, k))
+                 and LG[(l, er, k)][7] != "" else np.nan for l, _ in specs]
+            ax.errorbar(xs, y, yerr=e, fmt="o-", color=COL[j % len(COL)],
+                        lw=1.7, ms=5.5, capsize=3, alpha=.9,
+                        label=f"eval {er} px")
+        ax.set_xscale("log", base=2)
+        ax.set_xticks(xs)
+        ax.set_xticklabels([l.replace("MR", "") for l, _ in specs],
+                           rotation=30, fontsize=8.5)
+        ax.minorticks_off()
+        ax.set_xlabel("training-range width (max / min resolution)")
+        ax.set_ylabel(ylab)
+        ax.set_title(ttl, fontsize=11)
+        ax.grid(alpha=.25, lw=.6)
+        ax.set_axisbelow(True)
+        ax.legend(fontsize=8)
+    fig.suptitle("Effect of multi-resolution training-range width on "
+                 f"fragmentation-assessment fidelity (test, 8 seeds, "
+                 f"{interp.upper()} resize)", fontsize=12.5)
+    fig.tight_layout(rect=[0, 0.02, 1, 0.9])
+    q = FIG / f"frag_mr_width_{interp}_{STAMP}.png"
+    fig.savefig(q, dpi=170)
+    plt.close(fig)
+    print(f"저장: {q}")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--set", default="test")
+    ap.add_argument("--interp", default="area", choices=["area", "linear"],
+                    help="area=SR 파쇄도와 비교 가능(기본), linear=MR 인식표 규약")
+    ap.add_argument("--models", default="", help="예: MR[448-1024],MR[128-1600]")
+    ap.add_argument("--evals", default="", help="예: 448,512")
+    ap.add_argument("--seeds", default="0-7")
+    ap.add_argument("--report", action="store_true", help="추론 없이 집계만")
+    ap.add_argument("--force", action="store_true", help="원자료 삭제 후 재추론")
+    args = ap.parse_args()
+    OUT.mkdir(parents=True, exist_ok=True)
+    FIG.mkdir(parents=True, exist_ok=True)
+
+    ds = args.set
+    specs = MR_SPECS
+    if args.models:
+        keep = {s.strip() for s in args.models.split(",")}
+        specs = [m for m in MR_SPECS if m[0] in keep]
+    evals = ([int(s) for s in args.evals.split(",")] if args.evals else EVAL_RES)
+    if "-" in args.seeds:
+        a, b = args.seeds.split("-")
+        seeds = list(range(int(a), int(b) + 1))
+    else:
+        seeds = [int(s) for s in args.seeds.split(",")]
+
+    if not args.report:
+        run_all(args.interp, ds, specs, evals, seeds, force=args.force)
+    rows = seed_metrics(args.interp, ds, specs, evals, seeds)
+    if not rows:
+        print("집계할 결과가 없습니다.")
+        return
+    collapse_table(rows, specs, evals)
+    summarize(args.interp, rows, ds, specs, evals, drop_collapsed=False,
+              quiet=True)
+    out_long, _ = summarize(args.interp, rows, ds, specs, evals,
+                            drop_collapsed=True)
+    vs_sr(args.interp, out_long, specs, evals)
+    plot(args.interp, out_long, specs, evals)
+    print(f"\nCSV: {OUT}")
+
+
+if __name__ == "__main__":
+    main()

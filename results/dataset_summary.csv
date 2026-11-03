@@ -1,0 +1,4 @@
+split,n_images,n_annotations,n_gt_major_ge_4cm
+train,96,1974,
+val,24,456,78
+test,20,523,114

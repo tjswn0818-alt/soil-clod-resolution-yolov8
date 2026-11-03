@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Data, weights and intermediate files (not distributed)
+datasets/
+data/
+weights/
+runs/
+logs/
+figures/
+*.pt
+*.pth
+*.pkl
+*.log
+results/**/preds/
+results/frag/
+
+# Figures
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.svg
+*.tif
+*.tiff
+
+# Internal review files
+review_checklist.xlsx
+*manuscript_value_check*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

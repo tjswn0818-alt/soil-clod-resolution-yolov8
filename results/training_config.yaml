@@ -1,0 +1,217 @@
+# Training configuration of all YOLOv8m-seg models (9 single-resolution x 8 seeds, 6 multi-resolution x 8 seeds).
+# Values are taken from train_args stored in the 120 trained checkpoints; they are identical across models
+# except imgsz and seed (see input_resolution and training.seeds). Dataset/output paths are omitted.
+framework:
+  ultralytics: 8.4.69
+  python: 3.13.5
+  pytorch: 2.6.0 (CUDA 12.4)
+  gpu: NVIDIA GeForce RTX 4090
+model:
+  architecture: YOLOv8m-seg
+  init_weights: yolov8m-seg.pt (COCO pretrained)
+  classes: 1
+  checkpoint_used: best.pt (Ultralytics fitness on validation set)
+training:
+  epochs: 100
+  batch: 4
+  patience: 100
+  amp: true
+  optimizer: auto -> AdamW (lr 0.002, momentum 0.9), resolved by Ultralytics as logged in every run
+  weight_decay: 0.0005
+  lrf: 0.01
+  cos_lr: false
+  warmup_epochs: 3.0
+  warmup_momentum: 0.8
+  warmup_bias_lr: 0.0
+  close_mosaic: 10
+  seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  deterministic: true
+loss_gains:
+  box: 7.5
+  cls: 0.5
+  dfl: 1.5
+augmentation:
+  fliplr: 0.5
+  flipud: 0.5
+  degrees: 90
+  hsv_h: 0.03
+  hsv_s: 0.3
+  hsv_v: 0.2
+  scale: 0.4
+  translate: 0.1
+  mosaic: 1.0
+  mixup: 0.0
+  copy_paste: 0.0
+  shear: 0.0
+  perspective: 0.0
+sampling:
+  method: WeightedRandomSampler over training images (replacement)
+  image_weight: 0.3 + (3.0 - 0.3) * (share of clods with major axis >= 4 cm in the image)
+  major_axis_threshold: 176 px on a 2200 px grid (0.08 x longer image side = 4 cm in a 50 cm frame)
+input_resolution:
+  single_resolution_models:
+    train_imgsz:
+    - 128
+    - 256
+    - 384
+    - 448
+    - 512
+    - 736
+    - 1024
+    - 1280
+    - 1600
+  multi_resolution_models:
+    method: per-batch bilinear resize of the input batch to one size drawn uniformly from the ladder; dataloader imgsz = ladder maximum
+    ladders:
+      MR[128-1600]:
+      - 1600
+      - 1280
+      - 1024
+      - 736
+      - 512
+      - 448
+      - 384
+      - 256
+      - 128
+      MR[384-1600]:
+      - 1600
+      - 1280
+      - 1024
+      - 736
+      - 512
+      - 448
+      - 384
+      MR[448-1600]:
+      - 1600
+      - 1280
+      - 1024
+      - 736
+      - 512
+      - 448
+      MR[448-1280]:
+      - 1280
+      - 1024
+      - 736
+      - 512
+      - 448
+      MR[448-1024]:
+      - 1024
+      - 736
+      - 512
+      - 448
+      MR[448-736]:
+      - 736
+      - 512
+      - 448
+ultralytics_train_args:
+  agnostic_nms: false
+  amp: true
+  angle: 1.0
+  augment: false
+  auto_augment: randaugment
+  batch: 4
+  bgr: 0.0
+  box: 7.5
+  cache: false
+  cfg: null
+  classes: null
+  close_mosaic: 10
+  cls: 0.5
+  cls_pw: 0.0
+  compile: false
+  conf: null
+  copy_paste: 0.0
+  copy_paste_mode: flip
+  cos_lr: false
+  cutmix: 0.0
+  degrees: 90
+  deterministic: true
+  device: '0'
+  dfl: 1.5
+  dnn: false
+  dropout: 0.0
+  dynamic: false
+  embed: null
+  end2end: null
+  epochs: 100
+  erasing: 0.4
+  exist_ok: true
+  fliplr: 0.5
+  flipud: 0.5
+  format: torchscript
+  fraction: 1.0
+  freeze: null
+  half: false
+  hsv_h: 0.03
+  hsv_s: 0.3
+  hsv_v: 0.2
+  int8: false
+  iou: 0.7
+  keras: false
+  kobj: 1.0
+  line_width: null
+  lr0: 0.01
+  lrf: 0.01
+  mask_ratio: 4
+  max_det: 300
+  mixup: 0.0
+  mode: train
+  model: yolov8m-seg.pt
+  momentum: 0.937
+  mosaic: 1.0
+  multi_scale: 0.0
+  name: train
+  nbs: 64
+  nms: false
+  opset: null
+  optimize: false
+  optimizer: auto
+  overlap_mask: true
+  patience: 100
+  perspective: 0.0
+  pose: 12.0
+  pretrained: true
+  profile: false
+  rect: false
+  resume: false
+  retina_masks: false
+  rle: 1.0
+  save: true
+  save_conf: false
+  save_crop: false
+  save_frames: false
+  save_json: false
+  save_txt: false
+  scale: 0.4
+  shear: 0.0
+  show: false
+  show_boxes: true
+  show_conf: true
+  show_labels: true
+  simplify: true
+  single_cls: false
+  source: null
+  split: val
+  stream_buffer: false
+  task: segment
+  time: null
+  tracker: botsort.yaml
+  translate: 0.1
+  val: true
+  verbose: true
+  vid_stride: 1
+  visualize: false
+  warmup_bias_lr: 0.0
+  warmup_epochs: 3.0
+  warmup_momentum: 0.8
+  weight_decay: 0.0005
+  workers: 0
+  workspace: null
