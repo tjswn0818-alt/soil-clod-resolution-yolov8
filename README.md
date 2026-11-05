@@ -67,14 +67,38 @@ bootstrap 95% CI, **CI1 / CI_img** = image-level bootstrap 95% CI, `P_gt0` = boo
 - Fig. 11: `unified/unified_4cm_fps_260914.csv`, `unified/unified_4cm_sr_summary_260914.csv`
 - Fig. 12, 13: qualitative image results, no data file
 
+## Data
+
+Images and annotations are attached to the [v1.0 release](../../releases/tag/v1.0) (CC BY 4.0).
+
+`soil_clod_dataset_v1.0.zip`: the images used in the study, cropped to the inside of the 50 cm sampling frame.
+
+```
+data/
+  train/  images/ (96 .jpg)  _annotations.coco.json  labels/ (YOLO .txt)
+  val/    images/ (24 .jpg)  _annotations.coco.json  labels/ (YOLO .txt)
+  test/   images/ (20 .jpg)  _annotations.coco.json
+```
+
+| Split | Images | Annotated clods |
+|---|---|---|
+| train | 96 | 1,974 |
+| val | 24 | 456 |
+| test | 20 | 523 |
+
+- Labels are instance polygons in COCO segmentation format (`_annotations.coco.json`, pixel coordinates).
+  `labels/` holds the same polygons in YOLO segmentation format (normalised), used for training.
+- pixel (train/val) and 18 (test) both denote the single class 'clod' (names inherited from the Roboflow projects).
+
+The images contain no EXIF metadata (no GPS information).
+
 ## Code
 
 `unified_4cm_260914.py` produces `results/unified/*`; `fps_sr_260825.py` produces the speed file;
 `review_infer_261026.py` runs low-confidence inference that the `review_*` scripts analyse.
 Paths are set in `code/config.py` through `RES_SWEEP_ROOT` (weights, labels, outputs) and
 `PIXEL_DATA_ROOT` (COCO-format test/val sets).
-Original images, annotations, model weights and prediction files (.pkl) are not included,
-so a full re-run is not possible from this repository alone.
+Model weights and prediction files (.pkl) are not included, so a full re-run is not possible.
 
 ## Environment
 
