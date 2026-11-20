@@ -1,0 +1,49 @@
+﻿condition,train_res,seed,intended_changed,diff_keys_all,diff_keys_unexpected,aug_values
+mosaic0,512,0,1,data mosaic plots project save_dir save_period,plots save_period,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=0
+mosaic0,512,1,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=1
+mosaic0,512,2,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=2
+mosaic0,512,3,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=3
+mosaic0,512,4,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=4
+mosaic0,512,5,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=5
+mosaic0,512,6,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=6
+mosaic0,512,7,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=7
+mosaic0,1600,0,1,data mosaic plots project save_dir save_period,plots save_period,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=0
+mosaic0,1600,1,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=1
+mosaic0,1600,2,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=2
+mosaic0,1600,3,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=3
+mosaic0,1600,4,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=4
+mosaic0,1600,5,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=5
+mosaic0,1600,6,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=6
+mosaic0,1600,7,1,mosaic project save_dir,,mosaic=0.0 scale=0.4 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=7
+scale0,512,0,1,data plots project save_dir save_period scale,plots save_period,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=0
+scale0,512,1,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=1
+scale0,512,2,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=2
+scale0,512,3,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=3
+scale0,512,4,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=4
+scale0,512,5,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=5
+scale0,512,6,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=6
+scale0,512,7,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=7
+scale0,1600,0,1,data plots project save_dir save_period scale,plots save_period,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=0
+scale0,1600,1,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=1
+scale0,1600,2,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=2
+scale0,1600,3,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=3
+scale0,1600,4,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=4
+scale0,1600,5,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=5
+scale0,1600,6,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=6
+scale0,1600,7,1,project save_dir scale,,mosaic=1.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=7
+mosaic0_scale0,512,0,1,data mosaic plots project save_dir save_period scale,plots save_period,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=0
+mosaic0_scale0,512,1,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=1
+mosaic0_scale0,512,2,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=2
+mosaic0_scale0,512,3,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=3
+mosaic0_scale0,512,4,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=4
+mosaic0_scale0,512,5,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=5
+mosaic0_scale0,512,6,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=6
+mosaic0_scale0,512,7,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=7
+mosaic0_scale0,1600,0,1,data mosaic plots project save_dir save_period scale,plots save_period,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=0
+mosaic0_scale0,1600,1,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=1
+mosaic0_scale0,1600,2,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=2
+mosaic0_scale0,1600,3,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=3
+mosaic0_scale0,1600,4,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=4
+mosaic0_scale0,1600,5,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=5
+mosaic0_scale0,1600,6,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=6
+mosaic0_scale0,1600,7,1,mosaic project save_dir scale,,mosaic=0.0 scale=0.0 close_mosaic=10 mixup=0.0 copy_paste=0.0 degrees=90 translate=0.1 fliplr=0.5 flipud=0.5 hsv=0.03/0.3/0.2 epochs=100 seed=7

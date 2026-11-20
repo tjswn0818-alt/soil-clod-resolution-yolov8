@@ -1,0 +1,4 @@
+﻿split,n_GT_all,n_edge_all,ratio_all,n_GT_ge4cm,n_edge_ge4cm,ratio_ge4cm
+train,1974,31,0.0157,299,13,0.0435
+val,456,11,0.0241,78,1,0.0128
+test,523,18,0.0344,114,7,0.0614

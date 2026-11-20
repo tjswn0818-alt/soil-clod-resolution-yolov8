@@ -1,0 +1,7 @@
+﻿dataset,train_res,eval_res,Recall_8seed_mean
+test,512,1024,0.86513
+test,256,512,0.73136
+test,128,256,0.12829
+val,512,1024,0.82852
+val,256,512,0.75641
+val,128,256,0.12019

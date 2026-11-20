@@ -1,0 +1,4 @@
+﻿split,n,W_min,W_median,W_max,H_min,H_median,H_max,long_min,long_median,long_max,n_long_lt1600,n_nonsquare
+train,96,2228,2532,2741,2206,2477,2692,2228,2532,2741,0,94
+val,24,2273,2502,2703,2295,2437,2621,2295,2502,2703,0,24
+test,20,1658,1917,2085,1621,1821,2012,1658,1917,2085,0,20

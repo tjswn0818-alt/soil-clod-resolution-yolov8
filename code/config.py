@@ -4,6 +4,8 @@ RES_SWEEP_ROOT : 작업 루트. weights/ (sr, sr_seed, mr), data/pixel_yolo_spli
                  results/ 아래에 결과 CSV 를 쓴다. 기본값: 저장소 루트
 PIXEL_DATA_ROOT: 데이터셋 루트. 18.v1i.coco-segmentation/train (test), pixel_split/val (val).
                  기본값: <RES_SWEEP_ROOT>/datasets
+학습 run 폴더(results.csv, args.yaml, last.pt)는 <RES_SWEEP_ROOT>/runs, <RES_SWEEP_ROOT>/outputs_pixel_AB
+아래에 둔다. s0_inventory_runs.csv 의 run_dir, ckpt_copy 는 RES_SWEEP_ROOT 기준 상대경로.
 """
 import os
 from pathlib import Path
@@ -12,3 +14,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 RS_ROOT = Path(os.environ.get("RES_SWEEP_ROOT", REPO_ROOT)).resolve()
 PIXEL_ROOT = Path(os.environ.get("PIXEL_DATA_ROOT", RS_ROOT / "datasets")).resolve()
 REVIEW_DIR = RS_ROOT / "results" / "results_review_261026"
+R1_DIR = RS_ROOT / "results" / "results_review_r1_261116"         # r1_*.py 출력
+AUG_DIR = RS_ROOT / "results" / "results_review_r1_aug_261119"     # aug_*.py 출력 (runs/, weights/ 포함)
+RUN_ROOTS = [RS_ROOT / "runs", RS_ROOT / "outputs_pixel_AB"]
+
+
+def rel(p):
+    """RES_SWEEP_ROOT 기준 상대경로 (결과 CSV 에 절대경로를 남기지 않음)."""
+    p = Path(p).resolve()
+    try:
+        return p.relative_to(RS_ROOT).as_posix()
+    except ValueError:
+        return p.name
