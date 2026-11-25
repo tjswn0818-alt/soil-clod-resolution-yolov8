@@ -1,0 +1,7 @@
+﻿check,dataset,train_res,infer_size,seed,TP_or_recall,n_pred,n_GT,ref_TP_or_recall,ref_n_pred,ref_n_GT,match
+a3_cross,test,512,1024,mean8,0.86513,,,0.86513,,,1
+a3_cross,test,256,512,mean8,0.73136,,,0.73136,,,1
+a3_cross,test,128,256,mean8,0.12829,,,0.12829,,,1
+a3_cross,val,512,1024,mean8,0.82853,,,0.82852,,,1
+a3_cross,val,256,512,mean8,0.75641,,,0.75641,,,1
+a3_cross,val,128,256,mean8,0.12019,,,0.12019,,,1

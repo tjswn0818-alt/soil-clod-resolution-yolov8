@@ -1,0 +1,17 @@
+﻿condition,train_res,mode,n_img,n_img_equal,max_abs_diff,n_final_latency_sum,n_final_eval_sum
+A,448,tile_batch_b9x1,20,1,11,257,154
+A,448,tile_seq_b1x9,20,1,11,256,154
+A,512,tile_batch_b9x1,20,0,13,239,153
+A,512,tile_seq_b1x9,20,1,13,238,153
+A,1024,tile_batch_b9x1,20,9,3,145,131
+A,1024,tile_seq_b1x9,20,9,3,145,131
+A,1280,tile_batch_b9x1,20,10,2,134,126
+A,1280,tile_seq_b1x9,20,11,2,133,126
+A,1600,tile_batch_b9x1,20,16,1,124,120
+A,1600,tile_seq_b1x9,20,16,1,124,120
+B,128,tile_batch_b9x1,20,0,12,156,34
+B,128,tile_seq_b1x9,20,0,12,155,34
+B,256,tile_batch_b9x1,20,0,8,275,170
+B,256,tile_seq_b1x9,20,0,8,274,170
+B,512,tile_batch_b9x1,20,5,3,164,144
+B,512,tile_seq_b1x9,20,6,3,165,144

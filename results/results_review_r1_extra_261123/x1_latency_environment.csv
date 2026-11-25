@@ -1,0 +1,9 @@
+﻿item,value
+cpu,13th Gen Intel(R) Core(TM) i9-13900K
+gpu_driver,"NVIDIA GeForce RTX 4090, 610.88"
+torch,2.6.0+cu124
+cuda,12.4
+cudnn,90100
+ultralytics,8.4.69
+python,3.13.5
+os,Windows-11-10.0.26200-SP0

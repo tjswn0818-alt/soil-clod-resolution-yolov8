@@ -13,6 +13,8 @@ results/                       result CSV files (CC BY 4.0)
                                convergence, end-to-end latency, threshold recalibration, image and
                                ground-truth facts, tiled inference, bootstrap of additional contrasts
   results_review_r1_aug_261119/ training-augmentation ablation (mosaic / scale off, 512 and 1600 px, 8 seeds)
+  results_review_r1_extra_261123/ tiled inference with merged predictions and its latency; MR training ranges
+                               on the test, validation and additional test sets
   fps_sr_matched_260825.csv    inference speed measurement
   dataset_summary.csv          image / annotation counts per split
   training_config.yaml         training hyperparameters of all models
@@ -144,6 +146,70 @@ bootstrap: seed × image, B = 10,000, two-stage 95% CI.
 confidence > 0.5 and major axis ≥ 4 cm. In `aug8_args_diff_detail.csv`, seed-0 baseline runs differ from the
 ablation runs only in `save_period`, `plots` and the dataset path (same image and label files).
 
+### Tiled inference with merged predictions and the additional test set (`results/results_review_r1_extra_261123/`)
+
+**Merged tiled inference (`x1_*`).** Unlike `s7_*` (each ground truth assigned to one tile), every image is cut
+into 3 × 3 tiles of half the frame side (50% overlap) and all 9 tiles are inferred without ground-truth
+information. Predictions with score > 0.5 are kept; predictions with mask pixels within 2 px of an internal tile
+border (a tile side that is not a frame edge) are removed; the remaining masks are placed in frame coordinates
+and merged by greedy mask NMS (in descending score, a mask is dropped if its IoU with a kept mask is ≥ 0.5);
+predictions with major axis ≥ 4 cm are then matched with the ground truths as in P0 (IoU 0.5, greedy).
+Conditions **A** / **B** are those of `s7_*` (`tile_size` = tile input size, `fullframe_size` = full-frame input
+size compared with it: the training resolution for A, twice the training resolution for B). SR models, seeds 0–7,
+test and val.
+
+`method` values:
+**merge_base** = the merging above; **merge_ios** = NMS on intersection over the smaller mask (≥ 0.5) instead of
+IoU; **merge_margin0** = border rule removes only masks touching the internal border (0 px);
+**merge_margin4** = border rule at 4 px; **merge_noborder** = no border rule; **fullframe** = the whole frame as
+one input at `fullframe_size`, score > 0.5 and major axis ≥ 4 cm, no mask NMS; **fullframe_maskNMS** = fullframe
+followed by the same mask NMS.
+
+| File | What it contains | Main columns |
+|---|---|---|
+| `x1_merge_seed.csv` | Per-seed counts and metrics of every method | method, condition, train_res, tile_size, fullframe_size, dataset, seed, n_img, n_GT4, TP, n_pred, FP, FN, Recall, Precision, FN_per_img, FP_per_img |
+| `x1_merge_summary.csv` | merge_base, fullframe and fullframe_maskNMS: seed mean / SD with two-stage 95% CI; recall of the ground-truth-assigned tiling (`s7_tiling_summary.csv`, P0) for comparison | method, condition, train_res, dataset, Recall/Precision/FN_per_img/FP_per_img_mean·_sd·_CI_lo·_CI_hi, s7_GTassign_Recall_mean·_sd, s7_n_GT4_unassigned |
+| `x1_merge_sensitivity.csv` | Same as above for merge_ios, merge_margin0, merge_margin4, merge_noborder | same as above |
+| `x1_merge_pairdiff_ci.csv` | Paired differences `method − minus` (every method − fullframe; each sensitivity variant − merge_base) with two-stage 95% CI | method, minus, condition, train_res, dataset, d_Recall, d_Recall_CI_lo/hi, d_Precision…, d_FN_per_img…, d_FP_per_img… |
+| `x1_baseline_check_{a1,a2,a3,b}.csv` | Checks of the pipeline against earlier results: a1 = full frame from the stored predictions vs `s1_seed_metrics.csv` (P0, t = 0.5); a2 = new seed-0 full-frame inference (A) vs the same values; a3 = new full-frame inference for B vs the cross-resolution recall matrix; b = new tiles evaluated with ground-truth assignment vs `s7_tiling_seed.csv` | check, dataset, train_res, infer_size, seed, TP_or_recall, n_pred, n_GT, ref_*, match |
+| `x1_latency_raw.csv` | Latency per image and timed run (ms) | condition, train_res, tile_size, fullframe_size, mode, iter, file, pre_ms, fwd_ms, post_ms, merge_ms, total_ms, n_final |
+| `x1_latency_summary.csv` | Mean / SD / median of the file above, FPS = 1000 / total_mean | condition, train_res, mode, net_input, pre/fwd/post/merge/total_mean·_sd·_median, total_FPS, n_final_mean |
+| `x1_latency_environment.csv` | Hardware and software of the latency measurement | item, value |
+| `x1_latency_equiv.csv` | Number of final predictions in the latency run vs the evaluation (seed 0, test), per image | condition, train_res, mode, n_img, n_img_equal, max_abs_diff |
+| `x1_latency_logic_check.csv` | GPU merging of the latency code vs the evaluation merging on the same tile masks (seed 0, test) | condition, train_res, tile_size, n_img, n_img_equal |
+
+Bootstrap in `x1_*`: per dataset, rng 2026, B = 10,000; images resampled, then seeds resampled, metric = mean
+over the resampled seeds (two-stage); all methods share the same resamples, so differences are paired.
+Point values are seed means; `_sd` = SD over the 8 seeds.
+
+Latency `mode`: **fullframe** = one full-frame input at `fullframe_size` (as `s4_*`, `mask_mode` input);
+**tile_batch_b9x1** = the 9 tiles as one batch; **tile_seq_b1x9** = the 9 tiles one at a time (9 runs, summed).
+Seed 0, FP32, test images in memory, 10 warm-up and 100 timed runs, NMS at confidence 0.5 and IoU 0.7.
+`merge` = border rule, mask NMS, transfer of the kept masks to the CPU and the 4 cm filter (tile modes only);
+`total` = pre + fwd + post + merge.
+
+**MR training ranges (`x2_*`).** The six MR schemes at inference 448/512/736/1024 and SR models at the same
+resolutions (matched; SR-736 = model trained at 720 px, inferred at 736 px), plus SR-1600@1600, seeds 0–7,
+evaluated under P0 (t = 0.5, IoU 0.5 greedy, 4 cm) on the test set, the validation set and an additional test
+set. Dataset labels: `test`, `val`, and `new20_260623` / `new20_*` = **additional test set**: 20 images taken at
+the same site and on the same day as the test set, with 121 clods ≥ 4 cm, not used for training, validation or
+the choice of the MR ranges. Its images are not included.
+
+| File | What it contains | Main columns |
+|---|---|---|
+| `x2_mr_seed.csv` | Additional test set: per-seed metrics of every model and inference resolution | model, family, eval_res, seed, n_img, n_GT, TP, FN, FP, n_pred, Recall, Precision, FN_per_img, FP_per_img, ED_KS_D, n_pred_raw_conf0.001 |
+| `x2_mr_summary.csv` | Additional test set: seed mean / SD of the file above | model, eval_res, eval_in_train_range, n_seeds, Recall/Precision/FN_per_img/FP_per_img/ED_KS_D_mean·_sd·_n |
+| `x2_mr_compare.csv` | Recall mean / SD, FN and FP per image and KS D side by side: additional test set (`x2_mr_summary.csv`), test and val (`unified/unified_4cm_{mr,sr}_summary_260914.csv`, `unified_4cm_frag_{mr,sr}_260914.csv`) | model, eval_res, eval_in_train_range, new20_/test_/val_Recall_mean·_sd, _FN_per_img, _FP_per_img, _KS_D |
+| `x2_mr_pairdiff_ci.csv` | Paired differences: `main` = MR[448-1024] − SR matched, `aux` = MR[448-736] − MR[448-1024] (each at 448/512/736/1024), `aux_sr1600` = SR-512@512 − SR-1600@1600 | dataset, comparison_type, comparison, eval_res, metric, A_point, B_point, diff_A_minus_B, diff_seed_SD, CI2_lo/hi, P2_gt0, resolved_CI2_excludes0, CI1_img_lo/hi, resolved_CI1_excludes0 |
+| `x2_baseline_check.csv` | Test set, seed 0: TP / FP / FN and KS D from this code vs `unified_4cm` | model, eval_res, TP_this, TP_unified, …, KS_D_this, KS_D_unified, match |
+
+Bootstrap in `x2_*` (test and val from `unified/unified_4cm_perimage_260914.csv`): rng 2026, B = 10,000, images
+resampled, then seeds; **CI2** = two-stage (image × seed) 95% CI, **CI1_img** = image-only 95% CI (seed mean),
+`P2_gt0` = two-stage share of differences > 0, `resolved_*_excludes0` = 1 if the CI excludes 0; seed s of model A
+is paired with seed s of model B. `ED_KS_D` = Kolmogorov–Smirnov D between ground-truth and predicted
+equivalent diameters (images pooled). `eval_in_train_range` = 1 if the inference resolution lies in the MR
+training range.
+
 ## Figure data
 
 - Fig. 5: `results_review_261026/per_image_counts_conf05_261026.csv` (same values as Table 3)
@@ -151,8 +217,12 @@ ablation runs only in `save_period`, `plots` and the dataset path (same image an
 - Fig. 7: `unified/unified_4cm_cross_recall_test_260914.csv`, `unified_4cm_cross_recall_val_260914.csv`
 - Fig. 8: schematic, no data file
 - Fig. 9: `results_review_261026/gt_level_maxconf_261026.csv`
-- Fig. 10: tiled inference, `results_review_r1_261116/s7_tiling_summary.csv`, `s7_tiling_recall_ci.csv`,
-  `s7_cross_eval_reference_P0.csv`; cross-resolution matrix `unified/unified_4cm_cross_recall_test_260914.csv`
+- Fig. 10: (b) recall of tiled inference with ground-truth-selected tiles
+  `results_review_r1_261116/s7_tiling_summary.csv`, with merged predictions
+  `results_review_r1_extra_261123/x1_merge_summary.csv` (method merge_base), and full frame
+  `unified/unified_4cm_cross_recall_test_260914.csv`; (c) merged − full-frame differences
+  `results_review_r1_extra_261123/x1_merge_pairdiff_ci.csv` (method merge_base, minus fullframe) and latency ratio
+  `results_review_r1_extra_261123/x1_latency_summary.csv` (total_mean of tile_batch_b9x1 / fullframe)
 - Fig. 11: `unified/unified_4cm_mr_summary_260914.csv`, `unified_4cm_frag_mr_260914.csv`
 - Fig. 12: `unified/unified_4cm_fps_260914.csv`, `unified/unified_4cm_sr_summary_260914.csv`
 - Fig. 13, 14: qualitative image results, no data file
@@ -160,13 +230,19 @@ ablation runs only in `save_period`, `plots` and the dataset path (same image an
 ## Table data
 
 - Table 6: tiled inference, `results_review_r1_261116/s7_tiling_summary.csv` (conditions A, B and `full`),
-  `s7_cross_eval_reference_P0.csv` (full frame at the same clod pixel size for B), `s8_tiling_minus_full_ci.csv`
+  `s7_cross_eval_reference_P0.csv` (full frame at the same clod pixel size for B), `s8_tiling_minus_full_ci.csv`;
+  Recall, merged / Precision, merged / Precision, full frame: `results_review_r1_extra_261123/x1_merge_summary.csv`
+  (method merge_base and fullframe)
+- Table 8: MR training ranges on the test, additional test and validation sets,
+  `results_review_r1_extra_261123/x2_mr_compare.csv` (recall mean ± SD) and `x2_mr_pairdiff_ci.csv`
+  (comparison_type main, CI2)
 
 ## Data
 
 Images and annotations are attached to the [v1.0 release](../../releases/tag/v1.0) (CC BY 4.0).
-The dataset is unchanged in v1.1; the same `soil_clod_dataset_v1.0.zip` is attached to the
-[v1.1 release](../../releases/tag/v1.1).
+The dataset is unchanged in v1.1 and v1.2; the same `soil_clod_dataset_v1.0.zip` is attached to the
+[v1.1 release](../../releases/tag/v1.1) and the [v1.2 release](../../releases/tag/v1.2).
+The images of the additional test set (`results_review_r1_extra_261123/x2_*`) are not included.
 
 `soil_clod_dataset_v1.0.zip`: the images used in the study, cropped to the inside of the 50 cm sampling frame.
 
@@ -197,8 +273,14 @@ The images contain no EXIF metadata (no GPS information).
 s8 after s7) produce `results/results_review_r1_261116/*` from the same predictions.
 `aug_a1_train.py` trains the augmentation-ablation models (settings in `aug_train_common.py`) and
 `aug_a2_eval.py` then produces `results/results_review_r1_aug_261119/*`.
-Paths are set in `code/config.py` through `RES_SWEEP_ROOT` (weights, labels, outputs) and
-`PIXEL_DATA_ROOT` (COCO-format test/val sets); training run folders are expected under
+`r1_x1_*.py` and `r1_x2_*.py` (run after `unified_4cm_260914.py` and the `r1_s*` scripts) produce
+`results/results_review_r1_extra_261123/*`: merged tiled inference with `r1_x1_infer.py` → `r1_x1_check.py`
+(a1, a2, a3, b) → `r1_x1_eval.py` → `r1_x1_latency.py` → `r1_x1_latency_equiv.py`, `r1_x1_latency_logic.py`
+(shared functions in `r1_x1_common.py`); MR training ranges with `r1_x2_infer.py base` → `r1_x2_baseline.py` →
+`r1_x2_infer.py main` → `r1_x2_eval.py` (shared functions in `r1_x2_common.py`).
+Paths are set in `code/config.py` through `RES_SWEEP_ROOT` (weights, labels, outputs),
+`PIXEL_DATA_ROOT` (COCO-format test/val sets) and `EXTRA_TEST_DATA_ROOT` (additional test set, not
+distributed); training run folders are expected under
 `RES_SWEEP_ROOT` (`runs/`, `outputs_pixel_AB/`), and the output folders of the new scripts are set in `config.py`.
 Model weights and prediction files (.pkl) are not included, so a full re-run is not possible.
 
